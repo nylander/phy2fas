@@ -1,0 +1,139 @@
+#!/usr/bin/env perl
+#===============================================================================
+=pod
+
+=head1
+
+         FILE:  phy2fas
+
+        USAGE:  ./phy2fas [-h][-s][-w <length>][-i <infile>][-o <outfile>] phylip_file
+
+  DESCRIPTION:  Phylip to fasta converter.
+
+      OPTIONS:  -i, --infile=<file>  Specify one infile. If no -i, read from ARGV.
+                -o, --outfile=<file> Specify outfile. If no -o, print to STDOUT.
+                -w, --wrap=<length>  Wrap fasta sequence to  <length>. Default 60.
+                -s, --strict         Try to parse a strict phylip format (with 10
+                                     characters in the sequence label).
+                -h, --help           Show help
+
+ REQUIREMENTS:  BioPerl, perldoc for help
+
+        NOTES:  Will/may not work on strict phylip format where we may have
+                max 10 characters in the sequence label, then no space before
+                the first sequence position.
+                Might have to patch /usr/share/perl5/Bio/AlignIO/phylip.pm
+
+         BUGS:  ---
+
+         TODO:  Read from STDIN or file
+                Have wrap work (without going the distance)
+
+       AUTHOR:  Johan Nylander (JN)
+
+      COMPANY:  NRM/NBIS
+
+      VERSION:  2.0
+
+      CREATED:  08/09/2010 12:55:43 PM CEST
+
+     REVISION:  ons 25 mar 2020 12:50:38
+
+=cut
+
+#===============================================================================
+
+use strict;
+use warnings;
+use Bio::AlignIO;
+use Bio::SimpleAlign;
+use Getopt::Long;
+
+#exec('perldoc', $0) unless (@ARGV);
+
+my $infile  = q{};
+my $outfile = q{};
+my $VERBOSE = 0;
+my $wrap    = 60;
+my $strict  = 0;
+my $longid  = 1; 
+my @infiles = ();
+my $PRINT_FH;
+
+GetOptions(
+    "verbose!"  => \$VERBOSE,
+    "infile=s"  => \$infile,
+    "outfile=s" => \$outfile,
+    "wrap=i"    => \$wrap,
+    "strict"    => \$strict,
+    "help"      => sub { exec("perldoc", $0); exit(0); },
+);
+
+#if ($outfile) {
+#    open $PRINT_FH, ">", $outfile or die "Error: could not open $outfile for writing\n";
+#}
+#else {
+#    $PRINT_FH = *STDOUT; # Using the typeglob notation in order to use STDOUT as a variable
+#}
+
+if (! $infile) {
+    (@infiles) = (@ARGV);
+}
+else {
+    (@infiles) = $infile;
+}
+
+if ($strict) {
+    $longid = 0;
+}
+
+while (my $file = shift(@infiles) ) {
+
+    my $in = Bio::AlignIO->new(
+        -format => 'phylip',
+        -file   => $file,
+        -longid => $longid,
+    );
+
+    #my $stream = Bio::AlignIO->newFh(
+    #    -format => 'phylip',
+    #);
+
+    my $out;
+    if ($outfile) {
+        $out = Bio::AlignIO->new(
+            -format   => 'fasta',
+            -file     => ">$outfile",
+            -displayname_flat => 1,
+        );
+    }
+    else {
+        $out = Bio::AlignIO->new(
+            -format   => 'fasta',
+            -fh       => \*STDOUT,
+            -displayname_flat => 1,
+        );
+    }
+
+    #while (my $aln = <$stream>) {
+    #    print Dumper($aln); warn "\n HERE (hit return to continue)\n" and getc();
+    #    foreach my $seq ($aln->each_seq) {
+    #        print Dumper($seq); warn "\n HERE (hit return to continue)\n" and getc();
+    #    }
+    #}
+
+    while (my $aln = $in->next_aln) {
+        $out->write_aln($aln);
+        #foreach my $seq ($aln->each_seq) {
+        #    print $PRINT_FH ">", $seq->display_id, "\n";
+        #    my $sequence = $seq->seq;
+        #    $sequence =~ s/(.{$wrap})/$1\n/g;
+        #    print $PRINT_FH $sequence, "\n";
+        #}
+    }
+}
+
+if ($outfile) {
+    close();
+}
+
